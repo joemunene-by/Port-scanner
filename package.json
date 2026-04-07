@@ -1,0 +1,14 @@
+{
+  "name": "port-scanner-pro",
+  "version": "1.0.0",
+  "description": "A modern, high-performance web-based port scanner",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  }
+}

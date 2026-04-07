@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Port Scanner Pro</title>
+  <style>
+    /* ------------------------------------------------------------------ */
+    /* Reset & Base                                                        */
+    /* ------------------------------------------------------------------ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0a0f;
+      --surface:   rgba(16, 20, 30, 0.7);
+      --border:    rgba(0, 255, 170, 0.12);
+      --accent:    #00ffaa;
+      --cyan:      #00e5ff;
+      --red:       #ff4060;
+      --yellow:    #ffc107;
+      --text:      #c8d6e5;
+      --text-dim:  #5a6a7a;
+      --mono:      "SF Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+      --sans:      "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --radius:    14px;
+      --glass-bg:  rgba(14, 18, 28, 0.55);
+      --glass-blur: 18px;
+    }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
+    }
+
+    /* Ambient glow blobs */
+    body::before, body::after {
+      content: "";
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.15;
+      pointer-events: none;
+      z-index: 0;
+    }
+    body::before {
+      width: 500px; height: 500px;
+      background: var(--accent);
+      top: -120px; left: -100px;
+    }
+    body::after {
+      width: 400px; height: 400px;
+      background: var(--cyan);
+      bottom: -80px; right: -60px;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Header                                                              */
+    /* ------------------------------------------------------------------ */
+    header {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 48px 24px 16px;
+    }
+    header h1 {
+      font-size: 2.2rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, var(--accent), var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    header p {
+      color: var(--text-dim);
+      margin-top: 6px;
+      font-size: 0.95rem;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Glass card                                                          */
+    /* ------------------------------------------------------------------ */
+    .card {
+      position: relative;
+      z-index: 1;
+      width: 94%;
+      max-width: 720px;
+      margin: 24px auto;
+      padding: 28px 32px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(var(--glass-blur));
+      -webkit-backdrop-filter: blur(var(--glass-blur));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+    }
+    .card h2 {
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--accent);
+      margin-bottom: 20px;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Form                                                                */
+    /* ------------------------------------------------------------------ */
+    .form-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .field {
+      flex: 1;
+      min-width: 140px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .field.wide { flex: 2; min-width: 220px; }
+    label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+    }
+    input {
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.25s;
+    }
+    input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(0,255,170,0.12);
+    }
+    input::placeholder { color: var(--text-dim); }
+
+    /* ------------------------------------------------------------------ */
+    /* Button                                                              */
+    /* ------------------------------------------------------------------ */
+    .btn {
+      width: 100%;
+      padding: 13px;
+      border: none;
+      border-radius: 10px;
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: 1rem;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      color: var(--bg);
+      background: linear-gradient(135deg, var(--accent), var(--cyan));
+      transition: opacity 0.2s, transform 0.15s;
+      margin-top: 6px;
+    }
+    .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Progress                                                            */
+    /* ------------------------------------------------------------------ */
+    .progress-wrap {
+      margin-top: 18px;
+      display: none;
+    }
+    .progress-wrap.active { display: block; }
+    .progress-bar-outer {
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255,255,255,0.06);
+      overflow: hidden;
+    }
+    .progress-bar-inner {
+      height: 100%;
+      width: 0%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--cyan));
+      transition: width 0.3s ease;
+    }
+    .progress-text {
+      text-align: center;
+      margin-top: 8px;
+      font-size: 0.82rem;
+      font-family: var(--mono);
+      color: var(--text-dim);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Stats bar                                                           */
+    /* ------------------------------------------------------------------ */
+    .stats {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+    .stat {
+      flex: 1;
+      min-width: 100px;
+      text-align: center;
+      padding: 12px 8px;
+      background: rgba(0,0,0,0.25);
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.04);
+    }
+    .stat-value {
+      font-family: var(--mono);
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .stat-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Results table                                                       */
+    /* ------------------------------------------------------------------ */
+    .results-card { display: none; }
+    .results-card.visible { display: block; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--mono);
+      font-size: 0.88rem;
+    }
+    thead th {
+      text-align: left;
+      padding: 10px 12px;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--text-dim);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    tbody td {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+    tbody tr:hover { background: rgba(0,255,170,0.03); }
+
+    .status-open     { color: var(--accent); font-weight: 600; }
+    .status-closed   { color: var(--red);    font-weight: 600; }
+    .status-filtered { color: var(--yellow); font-weight: 600; }
+
+    .dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .dot-open     { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+    .dot-closed   { background: var(--red);    box-shadow: 0 0 6px var(--red); }
+    .dot-filtered { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
+
+    /* ------------------------------------------------------------------ */
+    /* Error                                                               */
+    /* ------------------------------------------------------------------ */
+    .error-msg {
+      display: none;
+      margin-top: 14px;
+      padding: 12px 16px;
+      background: rgba(255, 64, 96, 0.1);
+      border: 1px solid rgba(255, 64, 96, 0.25);
+      border-radius: 8px;
+      color: var(--red);
+      font-size: 0.9rem;
+    }
+    .error-msg.visible { display: block; }
+
+    /* ------------------------------------------------------------------ */
+    /* Filter tabs                                                         */
+    /* ------------------------------------------------------------------ */
+    .filter-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .filter-tab {
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: transparent;
+      color: var(--text-dim);
+      font-family: var(--sans);
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .filter-tab:hover { border-color: var(--accent); color: var(--text); }
+    .filter-tab.active {
+      background: rgba(0,255,170,0.1);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Footer                                                              */
+    /* ------------------------------------------------------------------ */
+    footer {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 32px 16px 24px;
+      font-size: 0.78rem;
+      color: var(--text-dim);
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+
+    /* ------------------------------------------------------------------ */
+    /* Responsive                                                          */
+    /* ------------------------------------------------------------------ */
+    @media (max-width: 500px) {
+      header h1 { font-size: 1.6rem; }
+      .card { padding: 20px 16px; }
+      .form-row { flex-direction: column; }
+    }
+
+    /* Spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(10,10,15,0.3);
+      border-top-color: var(--bg);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Port Scanner Pro</h1>
+    <p>High-performance TCP port scanning from your browser</p>
+  </header>
+
+  <!-- ===== SCAN FORM ===== -->
+  <div class="card">
+    <h2>Scan Configuration</h2>
+
+    <div class="form-row">
+      <div class="field wide">
+        <label for="target">Target Host</label>
+        <input id="target" type="text" placeholder="e.g. 127.0.0.1 or example.com" spellcheck="false" />
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="field">
+        <label for="startPort">Start Port</label>
+        <input id="startPort" type="number" value="1" min="1" max="65535" />
+      </div>
+      <div class="field">
+        <label for="endPort">End Port</label>
+        <input id="endPort" type="number" value="1024" min="1" max="65535" />
+      </div>
+    </div>
+
+    <button id="scanBtn" class="btn" onclick="startScan()">Scan Ports</button>
+
+    <div id="progress" class="progress-wrap">
+      <div class="progress-bar-outer">
+        <div id="progressBar" class="progress-bar-inner"></div>
+      </div>
+      <div id="progressText" class="progress-text">Initialising scan...</div>
+    </div>
+
+    <div id="errorMsg" class="error-msg"></div>
+  </div>
+
+  <!-- ===== RESULTS ===== -->
+  <div id="resultsCard" class="card results-card">
+    <h2>Scan Results</h2>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="filter-tabs" id="filterTabs">
+      <button class="filter-tab active" data-filter="all" onclick="applyFilter('all',this)">All</button>
+      <button class="filter-tab" data-filter="open"     onclick="applyFilter('open',this)">Open</button>
+      <button class="filter-tab" data-filter="closed"   onclick="applyFilter('closed',this)">Closed</button>
+      <button class="filter-tab" data-filter="filtered" onclick="applyFilter('filtered',this)">Filtered</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Port</th>
+          <th>Status</th>
+          <th>Service</th>
+        </tr>
+      </thead>
+      <tbody id="resultsBody"></tbody>
+    </table>
+  </div>
+
+  <footer>
+    Port Scanner Pro &mdash; for authorised testing only.
+  </footer>
+
+  <!-- ============================================================= -->
+  <script>
+    const API_BASE = window.location.origin;
+
+    let allResults = [];
+
+    /* -------------------------------------------------------------- */
+    /* Start a scan                                                    */
+    /* -------------------------------------------------------------- */
+    async function startScan() {
+      const target    = document.getElementById("target").value.trim();
+      const startPort = parseInt(document.getElementById("startPort").value, 10);
+      const endPort   = parseInt(document.getElementById("endPort").value, 10);
+      const btn       = document.getElementById("scanBtn");
+      const progress  = document.getElementById("progress");
+      const bar       = document.getElementById("progressBar");
+      const pText     = document.getElementById("progressText");
+      const errEl     = document.getElementById("errorMsg");
+      const resCard   = document.getElementById("resultsCard");
+
+      // Reset
+      errEl.classList.remove("visible");
+      resCard.classList.remove("visible");
+
+      // Validate
+      if (!target) return showError("Please enter a target host.");
+      if (isNaN(startPort) || isNaN(endPort) || startPort < 1 || endPort > 65535 || startPort > endPort)
+        return showError("Invalid port range. Use 1 - 65535, start <= end.");
+      if (endPort - startPort + 1 > 10000)
+        return showError("Maximum 10 000 ports per scan.");
+
+      // UI: scanning state
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>Scanning...';
+      progress.classList.add("active");
+      bar.style.width = "0%";
+      pText.textContent = `Scanning ${target} : ${startPort} - ${endPort} ...`;
+
+      // Fake progress (we don't have real streaming yet)
+      let fakeProgress = 0;
+      const progressInterval = setInterval(() => {
+        fakeProgress = Math.min(fakeProgress + Math.random() * 8, 92);
+        bar.style.width = fakeProgress + "%";
+      }, 400);
+
+      try {
+        const resp = await fetch(API_BASE + "/api/scan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ target, startPort, endPort }),
+        });
+
+        clearInterval(progressInterval);
+        bar.style.width = "100%";
+
+        const data = await resp.json();
+
+        if (!resp.ok) {
+          showError(data.error || "Scan failed.");
+          return;
+        }
+
+        pText.textContent = `Done -- scanned ${data.totalScanned} ports in ${data.elapsed}s`;
+        allResults = data.results;
+        renderStats(data);
+        applyFilter("all", document.querySelector('.filter-tab[data-filter="all"]'));
+        resCard.classList.add("visible");
+
+      } catch (e) {
+        clearInterval(progressInterval);
+        showError("Network error: could not reach the backend.");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = "Scan Ports";
+      }
+    }
+
+    /* -------------------------------------------------------------- */
+    /* Render stats                                                    */
+    /* -------------------------------------------------------------- */
+    function renderStats(data) {
+      const open     = data.results.filter(r => r.status === "open").length;
+      const closed   = data.results.filter(r => r.status === "closed").length;
+      const filtered = data.results.filter(r => r.status === "filtered").length;
+
+      document.getElementById("stats").innerHTML = `
+        <div class="stat"><div class="stat-value">${data.totalScanned}</div><div class="stat-label">Scanned</div></div>
+        <div class="stat"><div class="stat-value" style="color:var(--accent)">${open}</div><div class="stat-label">Open</div></div>
+        <div class="stat"><div class="stat-value" style="color:var(--red)">${closed}</div><div class="stat-label">Closed</div></div>
+        <div class="stat"><div class="stat-value" style="color:var(--yellow)">${filtered}</div><div class="stat-label">Filtered</div></div>
+        <div class="stat"><div class="stat-value" style="color:var(--cyan)">${data.elapsed}s</div><div class="stat-label">Time</div></div>
+      `;
+    }
+
+    /* -------------------------------------------------------------- */
+    /* Filter + render table                                           */
+    /* -------------------------------------------------------------- */
+    function applyFilter(filter, tabEl) {
+      // Activate tab
+      document.querySelectorAll(".filter-tab").forEach(t => t.classList.remove("active"));
+      if (tabEl) tabEl.classList.add("active");
+
+      const filtered = filter === "all"
+        ? allResults
+        : allResults.filter(r => r.status === filter);
+
+      const tbody = document.getElementById("resultsBody");
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-dim);padding:24px">No ports found for this filter.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(r => `
+        <tr>
+          <td>${r.port}</td>
+          <td>
+            <span class="dot dot-${r.status}"></span>
+            <span class="status-${r.status}">${r.status.toUpperCase()}</span>
+          </td>
+          <td>${r.service}</td>
+        </tr>
+      `).join("");
+    }
+
+    /* -------------------------------------------------------------- */
+    /* Error helper                                                    */
+    /* -------------------------------------------------------------- */
+    function showError(msg) {
+      const el = document.getElementById("errorMsg");
+      el.textContent = msg;
+      el.classList.add("visible");
+    }
+
+    /* Allow Enter key in inputs to trigger scan */
+    document.querySelectorAll("input").forEach(inp => {
+      inp.addEventListener("keydown", e => { if (e.key === "Enter") startScan(); });
+    });
+  </script>
+</body>
+</html>
